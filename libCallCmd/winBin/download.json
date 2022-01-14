@@ -1,0 +1,8 @@
+{
+    "downloader": {
+        "save_path": "C:/Users/Administrator/Videos/iTubeGo/Download/.temp/120_Lx0AAERcAAA",
+        "url": "https://www.youtube.com/watch?v=Fz9VRqSFZAc"
+    },
+ "ffmpeg_location":"./winBin/"
+}
+

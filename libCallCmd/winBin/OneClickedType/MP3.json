@@ -1,0 +1,9 @@
+{
+  "format": "mp3",
+  "audio": {
+    "encoder": "libmp3lame",
+    "channel": "origin",
+    "sample_rate": "origin",
+    "bit_rate": "origin"
+  }
+}

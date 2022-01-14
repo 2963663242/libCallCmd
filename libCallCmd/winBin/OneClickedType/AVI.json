@@ -1,0 +1,15 @@
+{
+  "format": "avi",
+  "video": {
+    "encoder": "libx264",
+    "resolution": "origin",
+    "frame_rate": "origin",
+    "bit_rate": "origin"
+  },
+  "audio": {
+    "encoder": "libmp3lame",
+    "channel": "origin",
+    "sample_rate": "origin",
+    "bit_rate": "origin"
+  }
+}

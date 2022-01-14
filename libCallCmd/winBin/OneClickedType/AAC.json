@@ -1,0 +1,9 @@
+{
+  "format": "aac",
+  "audio": {
+    "encoder": "libfdk_aac",
+    "channel": "origin",
+    "sample_rate": "origin",
+    "bit_rate": "origin"
+  }
+}

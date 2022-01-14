@@ -1,0 +1,15 @@
+{
+  "format": "mov",
+  "video": {
+    "encoder": "libx264",
+    "resolution": "origin",
+    "frame_rate": "origin",
+    "bit_rate": "origin"
+  },
+  "audio": {
+    "encoder": "aac",
+    "channel": "origin",
+    "sample_rate": "origin",
+    "bit_rate": "origin"
+  }
+}

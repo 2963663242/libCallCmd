@@ -1,0 +1,9 @@
+{
+  "format": "m4a",
+  "audio": {
+    "encoder": "aac",
+    "channel": "origin",
+    "sample_rate": "origin",
+    "bit_rate": "origin"
+  }
+}

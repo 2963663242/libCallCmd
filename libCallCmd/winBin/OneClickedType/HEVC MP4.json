@@ -1,0 +1,15 @@
+{
+  "format": "mp4",
+  "video": {
+    "encoder": "libx265",
+    "resolution": "origin",
+    "frame_rate": "origin",
+    "bit_rate": "origin"
+  },
+  "audio": {
+    "encoder": "libfdk_aac",
+    "channel": "origin",
+    "sample_rate": "origin",
+    "bit_rate": "origin"
+  }
+}

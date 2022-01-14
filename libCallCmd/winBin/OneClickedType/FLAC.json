@@ -1,0 +1,9 @@
+{
+  "format": "flac",
+  "audio": {
+    "encoder": "flac",
+    "channel": "origin",
+    "sample_rate": "origin",
+    "bit_rate": "origin"
+  }
+}

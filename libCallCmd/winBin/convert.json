@@ -1,0 +1,9 @@
+{
+    "converter": {
+        "input": "C:/Users/Administrator/Videos/iTubeGo/Download/At the Hospital _ Funny Episodes _ Classic Mr Bean.mp4",
+        "isNeedConvert": "true",
+        "preset": "OneClickedType/FLV.json",
+        "save_path": "C:/Users/Administrator/Videos/iTubeGo/Converted/"
+
+    }
+}

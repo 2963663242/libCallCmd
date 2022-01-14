@@ -1,0 +1,15 @@
+{
+  "format": "3gp",
+  "video": {
+    "encoder": "h263",
+    "resolution": "704x576",
+    "frame_rate": "origin",
+    "bit_rate": "origin"
+  },
+  "audio": {
+    "encoder": "aac",
+    "channel": "2",
+    "sample_rate": "44100",
+    "bit_rate": "160K"
+  }
+}

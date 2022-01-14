@@ -1,0 +1,15 @@
+{
+    "format": "wmv",
+    "video": {
+      "encoder": "wmv2",
+      "resolution": "origin",
+      "frame_rate": "origin",
+      "bit_rate": "origin"
+    },
+    "audio": {
+      "encoder": "wmav2",
+      "channel": "origin",
+      "sample_rate": "origin",
+      "bit_rate": "origin"
+    }
+  }

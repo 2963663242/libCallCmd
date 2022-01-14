@@ -1,0 +1,9 @@
+{
+  "format": "ogg",
+  "audio": {
+    "encoder": "libvorbis",
+    "channel": "origin",
+    "sample_rate": "origin",
+    "bit_rate": "origin"
+  }
+}

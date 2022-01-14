@@ -1,0 +1,9 @@
+{
+  "format": "aiff",
+  "audio": {
+    "encoder": "pcm_s16le",
+    "channel": "origin",
+    "sample_rate": "44100",
+    "bit_rate": "origin"
+  }
+}
