@@ -5,208 +5,144 @@
 #include <stdio.h>
 #include <tchar.h>
 #include <functional>
+#include <direct.h>
+#include <thread>
+#include <mutex>
+#include <string>
 using namespace std;
-void DisplayError(const char*) {
 
-}
-wstring Str2Wstr(string str)
-{
-	unsigned len = str.size() * 2;// Ô¤Áô×Ö½ÚÊý
-	setlocale(LC_CTYPE, "");     //±ØÐëµ÷ÓÃ´Ëº¯Êý
-	wchar_t* p = new wchar_t[len];// ÉêÇëÒ»¶ÎÄÚ´æ´æ·Å×ª»»ºóµÄ×Ö·û´®
-	mbstowcs(p, str.c_str(), len);// ×ª»»
-	std::wstring str1(p);
-	delete[] p;// ÊÍ·ÅÉêÇëµÄÄÚ´æ
-	return str1;
-}
-int open(wstring pszCmd, std::function<void(const char* bytes, size_t n)> read_stdout)
-{
-	wchar_t* ExePicPar = (wchar_t *)pszCmd.c_str();//ws_utf8.c_str();
-	wchar_t* MyDir = (wchar_t*)L"";
-	HANDLE hChildProcess = NULL;
-	HANDLE hStdIn = NULL; // Handle to parents std input.
-	BOOL bRunThread = TRUE;
+typedef std::function<void(const char* bytes)>  Callback;
+class Process {
+public:
+	int open(string  command, Callback callback) {
+		this->m_finished = 0;
+		HANDLE hread, hwrite;
+		SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+		if (!CreatePipe(&hread, &hwrite, &sa, 0))
+			DisplayError("CreatePipe");
 
+		PROCESS_INFORMATION pi;
+		STARTUPINFOA si;
+		ZeroMemory(&si, sizeof(STARTUPINFO));
+		si.cb = sizeof(STARTUPINFO);
+		si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+		si.hStdOutput = hwrite;
+		si.wShowWindow = SW_HIDE; //éšè—çª—å£ï¼›
 
+		if (!CreateProcessA(NULL, (char*)command.c_str(), NULL, NULL, TRUE,
+			CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+			DisplayError("CreateProcess");
 
-	HANDLE hOutputReadTmp, hOutputRead, hOutputWrite;
-	HANDLE hInputWriteTmp, hInputRead, hInputWrite;
-	HANDLE hErrorWrite;
-	SECURITY_ATTRIBUTES sa;
+		if (!CloseHandle(hwrite)) DisplayError("CloseHandle(hwrite)");
+		this->m_pid = pi.dwProcessId;
+		this->hProcess = pi.hProcess;
+		this->hThread = pi.hThread;
 
+		std::thread threadObj([=] {
+			ansyread(hread, callback);
+			});
+		threadObj.detach();
 
-	// Set up the security attributes struct.
-	sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-	sa.lpSecurityDescriptor = NULL;
-	sa.bInheritHandle = TRUE;
-
-
-	// Create the child output pipe.
-	if (!CreatePipe(&hOutputReadTmp, &hOutputWrite, &sa, 0))
-		DisplayError("CreatePipe");
-
-
-	// Create a duplicate of the output write handle for the std error
-	// write handle. This is necessary in case the child application
-	// closes one of its std output handles.
-	if (!DuplicateHandle(GetCurrentProcess(), hOutputWrite,
-		GetCurrentProcess(), &hErrorWrite, 0,
-		TRUE, DUPLICATE_SAME_ACCESS))
-		DisplayError("DuplicateHandle");
-
-
-	// Create the child input pipe.
-	if (!CreatePipe(&hInputRead, &hInputWriteTmp, &sa, 0))
-		DisplayError("CreatePipe");
-
-
-	// Create new output read handle and the input write handles. Set
-	// the Properties to FALSE. Otherwise, the child inherits the
-	// properties and, as a result, non-closeable handles to the pipes
-	// are created.
-	if (!DuplicateHandle(GetCurrentProcess(), hOutputReadTmp,
-		GetCurrentProcess(),
-		&hOutputRead, // Address of new handle.
-		0, FALSE, // Make it uninheritable.
-		DUPLICATE_SAME_ACCESS))
-		DisplayError("DupliateHandle");
-
-	if (!DuplicateHandle(GetCurrentProcess(), hInputWriteTmp,
-		GetCurrentProcess(),
-		&hInputWrite, // Address of new handle.
-		0, FALSE, // Make it uninheritable.
-		DUPLICATE_SAME_ACCESS))
-		DisplayError("DupliateHandle");
-
-
-	// Close inheritable copies of the handles you do not want to be
-	// inherited.
-	if (!CloseHandle(hOutputReadTmp)) DisplayError("CloseHandle");
-	if (!CloseHandle(hInputWriteTmp)) DisplayError("CloseHandle");
-
-
-	//PrepAndLaunchRedirectedChild(hOutputWrite,hInputRead,hErrorWrite,ExePar);
-
-
-	PROCESS_INFORMATION pi;
-	STARTUPINFO si;
-
-	// Set up the start up info struct.
-	ZeroMemory(&si, sizeof(STARTUPINFO));
-	si.cb = sizeof(STARTUPINFO);
-	si.dwFlags = STARTF_USESTDHANDLES;
-	si.hStdOutput = hOutputWrite;
-	si.hStdInput = hInputRead;
-	si.hStdError = hErrorWrite;
-
-	/*wchar_t ExePar[MAX_PATH * 5] = { 0 };
-	wchar_t pwd[MAX_PATH * 2] = { 0, };
-	_wgetcwd(pwd, MAX_PATH * 2);
-	wcscat(ExePar, pwd);
-	wcscat(ExePar, MyDir);
-	wcscat(ExePar, L" ");
-	wcscat(ExePar, ExePicPar);*/
-
-
-	int pathsize = 0;
-	pathsize = wcslen(ExePicPar);
-	int totalSize = ((pathsize + 1) * 2) + MAX_PATH * 2;
-	wchar_t* ExePar = (wchar_t*)malloc(totalSize);
-	memset(ExePar, 0, totalSize);
-	wchar_t pwd[MAX_PATH * 2] = { 0, };
-	_wgetcwd(pwd, MAX_PATH * 2);
-	wcscat(ExePar, pwd);
-	wcscat(ExePar, MyDir);
-	//wcscat(ExePar, L" ");
-	wcscat(ExePar, ExePicPar);
-
-	//if (!CreateProcess(NULL,ExePar,NULL,NULL,TRUE,
-	//	 CREATE_SUSPENDED|DEBUG_ONLY_THIS_PROCESS|NORMAL_PRIORITY_CLASS|CREATE_NO_WINDOW,NULL,NULL,&si,&pi))
-	//	DisplayError("CreateProcess");
-	if (!CreateProcess(NULL, ExePar, NULL, NULL, TRUE,
-		CREATE_SUSPENDED | CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
-		DisplayError("CreateProcess");
-	//µ÷Õû½ø³ÌÓÅÏÈ¼¶Îª×îµÍ
-/*	if (!SetPriorityClass(pi.hProcess, IDLE_PRIORITY_CLASS))
-		DisplayError("SetPriorityClass");*/
-	free(ExePar);
-	//MessageBox(0, ExePar, L"", 0);
-	// Set global child process handle to cause threads to exit.
-	hChildProcess = pi.hProcess;
-	//m_hProcess=(void*)pi.hThread;
-	ResumeThread(pi.hThread);
-	//ÌáÇ°¹Ø±Õ¾ä±ú£¬ÓÐÀûÓÚ¹ÜµÀµÄ¹Ø±Õ£¬²»»á¿¨ËÀ£¬µ«ÊÇ½ø³Ì¿ØÖÆµÄÏà¹Øº¯Êý¾Í²»ÄÜÊ¹ÓÃ
-	//ËùÒÔÔÚ½ø³Ì¹Ø±ÕÖ®ºó£¬ÔÙ¹Ø±Õ¾ä±ú
-	//¹Ø±Õ¾ä±ú£¬¶ÁÈ¡¹ÜµÀ×Ô¶¯¹Ø±Õ£¬·ñÔò¿¨µ½¶ÁÈ¡¹ÜµÀ
-	// Close any unnecessary handles.
-	//if (!CloseHandle(pi.hThread)) DisplayError("CloseHandle");
-
-
-
-
-	// Close pipe handles (do not continue to modify the parent).
-	// You need to make sure that no handles to the write end of the
-	// output pipe are maintained in this process or else the pipe will
-	// not close when the child process exits and the ReadFile will hang.
-	if (!CloseHandle(hOutputWrite)) DisplayError("CloseHandle");
-	if (!CloseHandle(hInputRead)) DisplayError("CloseHandle");
-	if (!CloseHandle(hErrorWrite)) DisplayError("CloseHandle");
-
-	const size_t buffer_size = 131072;
-	string strRetTmp;
-	char buff[1024] = { 0 };
-	DWORD dwRead = 0;
-	strRetTmp = buff;
-	DWORD n;
-	std::unique_ptr<char[]> buffer(new char[buffer_size]);
-	char szRecvData[512] = { 0 };
-	DWORD dwRecvSize = 0;
-	std::string szOutputLine;
-	
-	while (FALSE != ReadFile(hOutputRead, szRecvData, _countof(szRecvData) - 1, &dwRecvSize, NULL))
+		return  1;
+	}
+	void kill()
 	{
-		szRecvData[dwRecvSize] = '\0';
+		
+		std::string szBuf = std::string("taskkill /PID ") + std::to_string((unsigned)this->m_pid) + (" /T /F");
+		WinExec(szBuf.c_str(), SW_HIDE);
+		m_lock.lock();
+		if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
+		this->hThread = 0;
+		if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
+		this->hProcess = 0;
 
-		char* szLinesBegin = szRecvData;
-		char* szLinesEnd = NULL;
+		m_lock.unlock();
+	}
+	int get_exit_status() {
+		if (this->m_pid == 0)
+			return -1;
+		DWORD exit_status;
+		WaitForSingleObject(this->hProcess, INFINITE);
+		if (!GetExitCodeProcess(this->hProcess, &exit_status))
+			exit_status = -1;
+		while (true) {
 
-		while (true)
-		{
-			char* szFound = szLinesBegin + strcspn(szLinesBegin, "\r\n");
-			szLinesEnd = *szFound != '\0' ? szFound : NULL;
-
-			if (NULL == szLinesEnd)
-			{
-				szOutputLine += szLinesBegin;
+			if (this->m_finished == 1)
 				break;
-			}
-
-			*szLinesEnd = '\0';
-
-			if (false == szOutputLine.empty())
-			{
-				szOutputLine += szLinesBegin;
-				read_stdout((char*)szOutputLine.c_str(), 0);
-				//stateInform_s(callBack, (char*)szOutputLine.c_str());
-				szOutputLine.clear();
-			}
-			else
-			{
-				if (*szLinesBegin != '\0')
-				{
-					read_stdout(szLinesBegin, 0);
-					//stateInform_s(callBack, szLinesBegin);
-				}
-
-			}
-
-			szLinesBegin = szLinesEnd + 1;
+			Sleep(0);
 		}
-
+		return static_cast<int>(exit_status);
 	}
 
-	
+private:
+	void DisplayError(const char* promt) {
+		cout << promt << " error" << endl;
+	}
+	void ansyread(HANDLE hread, Callback cl) {
+		char szRecvData[512] = { 0 };
+		DWORD dwRecvSize = 0;
+		std::string szOutputLine;
+		while (FALSE != ReadFile(hread, szRecvData, _countof(szRecvData) - 1, &dwRecvSize, NULL))
+		{
+			szRecvData[dwRecvSize] = '\0';
+			char* szLinesBegin = szRecvData;
+			char* szLinesEnd = NULL;
 
-	CloseHandle(hOutputRead);//¹Ø±Õ¹ÜµÀµÄÊä³ö¶Ë¿Ú£»
-	return 1;
-}
+			while (true)
+			{
+				char* szFound = szLinesBegin + strcspn(szLinesBegin, "\r\n");
+				szLinesEnd = *szFound != '\0' ? szFound : NULL;
+
+				if (NULL == szLinesEnd)
+				{
+					szOutputLine += szLinesBegin;
+					break;
+				}
+
+				*szLinesEnd = '\0';
+
+				if (false == szOutputLine.empty())
+				{
+					szOutputLine += szLinesBegin;
+					cl(szOutputLine.c_str());
+					//stateInform_s(callBack, (char*)szOutputLine.c_str());
+					szOutputLine.clear();
+				}
+				else
+				{
+					if (*szLinesBegin != '\0')
+					{
+						cl(szLinesBegin);
+						//stateInform_s(callBack, szLinesBegin);
+					}
+
+				}
+
+				szLinesBegin = szLinesEnd + 1;
+			}
+
+		}
+		if (!CloseHandle(hread)) DisplayError("CloseHandle(hread)");
+		m_lock.lock();
+		if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
+		this->hThread = 0;
+		if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
+		this->hProcess = 0;
+		
+		m_lock.unlock();
+		this->m_finished = 1;
+	}
+	
+private:
+	HANDLE hProcess, hThread;
+	std::mutex m_lock;
+	DWORD m_pid = 0;
+	BOOL m_finished = 1;
+};
+
+
+
+
+
+
+
