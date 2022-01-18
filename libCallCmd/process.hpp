@@ -14,93 +14,109 @@ using namespace std;
 typedef std::function<void(const char* bytes)>  Callback;
 class Process {
 public:
+	Process() {
+		InitializeCriticalSection(&Critical);
+	}
 	int open(string  command, Callback callback) {
-		this->m_finished = 0;
-		HANDLE hread, hwrite;
-		SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-		if (!CreatePipe(&hread, &hwrite, &sa, 0))
-			DisplayError("CreatePipe");
+		do {
+			this->m_finished = 0;
+			HANDLE hread, hwrite;
+			SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+			if (!CreatePipe(&hread, &hwrite, &sa, 0))
+				DisplayError("CreatePipe");
+			PROCESS_INFORMATION pi;
+			STARTUPINFOA si;
+			ZeroMemory(&si, sizeof(STARTUPINFO));
+			si.cb = sizeof(STARTUPINFO);
+			si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+			si.hStdOutput = hwrite;
+			si.wShowWindow = SW_HIDE; //隐藏窗口；
+			//m_lock.lock();
+			EnterCriticalSection(&Critical);
+			if (this->enablekill == true) {
+				LeaveCriticalSection(&Critical);
+				break;
+			}
+				
+			if (!CreateProcessA(NULL, (char*)command.c_str(), NULL, NULL, TRUE,
+				CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+				DisplayError("CreateProcess");
+			LeaveCriticalSection(&Critical);
+			//m_lock.unlock();
+			if (!CloseHandle(hwrite)) DisplayError("CloseHandle(hwrite)");
+			this->m_pid = pi.dwProcessId;
+			this->hProcess = pi.hProcess;
+			this->hThread = pi.hThread;
 
-		PROCESS_INFORMATION pi;
-		STARTUPINFOA si;
-		ZeroMemory(&si, sizeof(STARTUPINFO));
-		si.cb = sizeof(STARTUPINFO);
-		si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-		si.hStdOutput = hwrite;
-		si.wShowWindow = SW_HIDE; //隐藏窗口；
-
-		if (!CreateProcessA(NULL, (char*)command.c_str(), NULL, NULL, TRUE,
-			CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
-			DisplayError("CreateProcess");
-
-		if (!CloseHandle(hwrite)) DisplayError("CloseHandle(hwrite)");
-		this->m_pid = pi.dwProcessId;
-		this->hProcess = pi.hProcess;
-		this->hThread = pi.hThread;
-
-	/*	std::thread threadObj([=] {
-			ansyread(hread, callback);
-			});*/
-		/*threadObj.detach();*/
-		char szRecvData[512] = { 0 };
-		DWORD dwRecvSize = 0;
-		std::string szOutputLine;
-		while (FALSE != ReadFile(hread, szRecvData, _countof(szRecvData) - 1, &dwRecvSize, NULL))
-		{
-			szRecvData[dwRecvSize] = '\0';
-			char* szLinesBegin = szRecvData;
-			char* szLinesEnd = NULL;
-
-			while (true)
+			/*	std::thread threadObj([=] {
+					ansyread(hread, callback);
+					});*/
+					/*threadObj.detach();*/
+			char szRecvData[512] = { 0 };
+			DWORD dwRecvSize = 0;
+			std::string szOutputLine;
+			while (FALSE != ReadFile(hread, szRecvData, _countof(szRecvData) - 1, &dwRecvSize, NULL))
 			{
-				char* szFound = szLinesBegin + strcspn(szLinesBegin, "\r\n");
-				szLinesEnd = *szFound != '\0' ? szFound : NULL;
+				szRecvData[dwRecvSize] = '\0';
+				char* szLinesBegin = szRecvData;
+				char* szLinesEnd = NULL;
 
-				if (NULL == szLinesEnd)
+				while (true)
 				{
-					szOutputLine += szLinesBegin;
-					break;
-				}
+					char* szFound = szLinesBegin + strcspn(szLinesBegin, "\r\n");
+					szLinesEnd = *szFound != '\0' ? szFound : NULL;
 
-				*szLinesEnd = '\0';
-
-				if (false == szOutputLine.empty())
-				{
-					szOutputLine += szLinesBegin;
-					callback(szOutputLine.c_str());
-					//stateInform_s(callBack, (char*)szOutputLine.c_str());
-					szOutputLine.clear();
-				}
-				else
-				{
-					if (*szLinesBegin != '\0')
+					if (NULL == szLinesEnd)
 					{
-						callback(szLinesBegin);
-						//stateInform_s(callBack, szLinesBegin);
+						szOutputLine += szLinesBegin;
+						break;
 					}
 
+					*szLinesEnd = '\0';
+
+					if (false == szOutputLine.empty())
+					{
+						szOutputLine += szLinesBegin;
+						callback(szOutputLine.c_str());
+						//stateInform_s(callBack, (char*)szOutputLine.c_str());
+						szOutputLine.clear();
+					}
+					else
+					{
+						if (*szLinesBegin != '\0')
+						{
+							callback(szLinesBegin);
+							//stateInform_s(callBack, szLinesBegin);
+						}
+
+					}
+
+					szLinesBegin = szLinesEnd + 1;
 				}
 
-				szLinesBegin = szLinesEnd + 1;
 			}
-
-		}
-		if (!CloseHandle(hread)) DisplayError("CloseHandle(hread)");
-		m_lock.lock();
-		if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
-		this->hThread = 0;
-		if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
-		this->hProcess = 0;
-
-		m_lock.unlock();
+			if (!CloseHandle(hread)) DisplayError("CloseHandle(hread)");
+			m_lock.lock();
+			if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
+			this->hThread = 0;
+			if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
+			this->hProcess = 0;
+			m_lock.unlock();
+		} while (false);
+		
+		DisplayError("over");
 		this->m_finished = 1;
+		this->enablekill = 0;
 		return  1;
 	}
 	void kill()
 	{
 		
+		EnterCriticalSection(&Critical);
+		this->enablekill = 1;
 		std::string szBuf = std::string("taskkill /PID ") + std::to_string((unsigned)this->m_pid) + (" /T /F");
 		WinExec(szBuf.c_str(), SW_HIDE);
+		LeaveCriticalSection(&Critical);
 		m_lock.lock();
 		if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
 		this->hThread = 0;
@@ -123,7 +139,18 @@ public:
 		}
 		return static_cast<int>(exit_status);
 	}
-
+	int aysnOpen(string  command, Callback callback) {
+		HANDLE eve = CreateEvent(NULL, FALSE, FALSE, NULL);
+		this->enablekill = 0;
+		thread thread1([=]() {
+			SetEvent(eve);
+			this->open(command, callback);
+			});
+		thread1.detach();
+		WaitForSingleObject(eve, INFINITE);
+		CloseHandle(eve);
+		return 1;
+	}
 private:
 	void DisplayError(const char* promt) {
 		cout << promt << " error" << endl;
@@ -135,8 +162,11 @@ private:
 private:
 	HANDLE hProcess, hThread;
 	std::mutex m_lock;
+	std::mutex m_lock_stop;
+	CRITICAL_SECTION Critical;
 	DWORD m_pid = 0;
 	BOOL m_finished = 1;
+	bool enablekill = 0;
 };
 
 
