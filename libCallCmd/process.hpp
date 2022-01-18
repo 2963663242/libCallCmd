@@ -38,47 +38,10 @@ public:
 		this->hProcess = pi.hProcess;
 		this->hThread = pi.hThread;
 
-		std::thread threadObj([=] {
+	/*	std::thread threadObj([=] {
 			ansyread(hread, callback);
-			});
-		threadObj.detach();
-
-		return  1;
-	}
-	void kill()
-	{
-		
-		std::string szBuf = std::string("taskkill /PID ") + std::to_string((unsigned)this->m_pid) + (" /T /F");
-		WinExec(szBuf.c_str(), SW_HIDE);
-		m_lock.lock();
-		if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
-		this->hThread = 0;
-		if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
-		this->hProcess = 0;
-
-		m_lock.unlock();
-	}
-	int get_exit_status() {
-		if (this->m_pid == 0)
-			return -1;
-		DWORD exit_status;
-		WaitForSingleObject(this->hProcess, INFINITE);
-		if (!GetExitCodeProcess(this->hProcess, &exit_status))
-			exit_status = -1;
-		while (true) {
-
-			if (this->m_finished == 1)
-				break;
-			Sleep(0);
-		}
-		return static_cast<int>(exit_status);
-	}
-
-private:
-	void DisplayError(const char* promt) {
-		cout << promt << " error" << endl;
-	}
-	void ansyread(HANDLE hread, Callback cl) {
+			});*/
+		/*threadObj.detach();*/
 		char szRecvData[512] = { 0 };
 		DWORD dwRecvSize = 0;
 		std::string szOutputLine;
@@ -104,7 +67,7 @@ private:
 				if (false == szOutputLine.empty())
 				{
 					szOutputLine += szLinesBegin;
-					cl(szOutputLine.c_str());
+					callback(szOutputLine.c_str());
 					//stateInform_s(callBack, (char*)szOutputLine.c_str());
 					szOutputLine.clear();
 				}
@@ -112,7 +75,7 @@ private:
 				{
 					if (*szLinesBegin != '\0')
 					{
-						cl(szLinesBegin);
+						callback(szLinesBegin);
 						//stateInform_s(callBack, szLinesBegin);
 					}
 
@@ -128,9 +91,45 @@ private:
 		this->hThread = 0;
 		if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
 		this->hProcess = 0;
-		
+
 		m_lock.unlock();
 		this->m_finished = 1;
+		return  1;
+	}
+	void kill()
+	{
+		
+		std::string szBuf = std::string("taskkill /PID ") + std::to_string((unsigned)this->m_pid) + (" /T /F");
+		WinExec(szBuf.c_str(), SW_HIDE);
+		m_lock.lock();
+		if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
+		this->hThread = 0;
+		if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
+		this->hProcess = 0;
+		m_lock.unlock();
+	}
+	int get_exit_status() {
+		if (this->m_pid == 0)
+			return -1;
+		DWORD exit_status;
+		WaitForSingleObject(this->hProcess, INFINITE);
+		if (!GetExitCodeProcess(this->hProcess, &exit_status))
+			exit_status = -1;
+		while (true) {
+
+			if (this->m_finished == 1)
+				break;
+			Sleep(0);
+		}
+		return static_cast<int>(exit_status);
+	}
+
+private:
+	void DisplayError(const char* promt) {
+		cout << promt << " error" << endl;
+	}
+	void ansyread(HANDLE hread, Callback cl) {
+		
 	}
 	
 private:
