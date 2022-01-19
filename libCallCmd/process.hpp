@@ -1,14 +1,15 @@
 #pragma once
-
-#include <iostream>
 #include <windows.h>
+#include <TlHelp32.h>
 #include <stdio.h>
 #include <tchar.h>
+#include <iostream>
 #include <functional>
 #include <direct.h>
 #include <thread>
 #include <mutex>
 #include <string>
+#include <TlHelp32.h>
 using namespace std;
 
 typedef std::function<void(const char* bytes)>  Callback;
@@ -104,6 +105,7 @@ public:
 		DisplayError("open over");
 		this->m_finished = 1;
 		this->enablekill = 0;
+		this->m_pid = 0;
 		return  1;
 	}
 	void kill()
@@ -111,8 +113,29 @@ public:
 		
 		this->m_lock_stop.lock();
 		this->enablekill = 1;
-		std::string szBuf = std::string("taskkill /PID ") + std::to_string((unsigned)this->m_pid) + (" /T /F");
-		WinExec(szBuf.c_str(), SW_HIDE);
+		/*std::string szBuf = std::string("taskkill /PID ") + std::to_string((unsigned)this->m_pid) + (" /T /F");
+		WinExec(szBuf.c_str(), SW_HIDE);*/
+		if (this->m_pid > 0) {
+			HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+			if (snapshot) {
+				PROCESSENTRY32 process;
+				ZeroMemory(&process, sizeof(process));
+				process.dwSize = sizeof(process);
+				if (Process32First(snapshot, &process)) {
+					do {
+						if (process.th32ParentProcessID == this->m_pid) {
+							HANDLE process_handle = OpenProcess(PROCESS_TERMINATE, FALSE, process.th32ProcessID);
+							if (process_handle) {
+								TerminateProcess(process_handle, 2);
+								CloseHandle(process_handle);
+							}
+						}
+					} while (Process32Next(snapshot, &process));
+				}
+				CloseHandle(snapshot);
+			}
+			TerminateProcess(this->hProcess, 2);
+		}
 		this->m_lock_stop.unlock();
 		m_lock.lock();
 		if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
