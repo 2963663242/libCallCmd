@@ -14,9 +14,6 @@ using namespace std;
 typedef std::function<void(const char* bytes)>  Callback;
 class Process {
 public:
-	Process() {
-		InitializeCriticalSection(&Critical);
-	}
 	int open(string  command, Callback callback) {
 		do {
 			this->m_finished = 0;
@@ -32,16 +29,16 @@ public:
 			si.hStdOutput = hwrite;
 			si.wShowWindow = SW_HIDE; //隐藏窗口；
 			//m_lock.lock();
-			EnterCriticalSection(&Critical);
+			this->m_lock_stop.lock();
 			if (this->enablekill == true) {
-				LeaveCriticalSection(&Critical);
+				this->m_lock_stop.unlock();
 				break;
 			}
 				
 			if (!CreateProcessA(NULL, (char*)command.c_str(), NULL, NULL, TRUE,
 				CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
 				DisplayError("CreateProcess");
-			LeaveCriticalSection(&Critical);
+			this->m_lock_stop.unlock();
 			//m_lock.unlock();
 			if (!CloseHandle(hwrite)) DisplayError("CloseHandle(hwrite)");
 			this->m_pid = pi.dwProcessId;
@@ -104,7 +101,7 @@ public:
 			m_lock.unlock();
 		} while (false);
 		
-		DisplayError("over");
+		DisplayError("open over");
 		this->m_finished = 1;
 		this->enablekill = 0;
 		return  1;
@@ -112,11 +109,11 @@ public:
 	void kill()
 	{
 		
-		EnterCriticalSection(&Critical);
+		this->m_lock_stop.lock();
 		this->enablekill = 1;
 		std::string szBuf = std::string("taskkill /PID ") + std::to_string((unsigned)this->m_pid) + (" /T /F");
 		WinExec(szBuf.c_str(), SW_HIDE);
-		LeaveCriticalSection(&Critical);
+		this->m_lock_stop.unlock();
 		m_lock.lock();
 		if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
 		this->hThread = 0;
@@ -135,7 +132,6 @@ public:
 
 			if (this->m_finished == 1)
 				break;
-			Sleep(0);
 		}
 		return static_cast<int>(exit_status);
 	}
@@ -155,15 +151,10 @@ private:
 	void DisplayError(const char* promt) {
 		cout << promt << " error" << endl;
 	}
-	void ansyread(HANDLE hread, Callback cl) {
-		
-	}
-	
 private:
-	HANDLE hProcess, hThread;
+	HANDLE hProcess=0, hThread=0;
 	std::mutex m_lock;
 	std::mutex m_lock_stop;
-	CRITICAL_SECTION Critical;
 	DWORD m_pid = 0;
 	BOOL m_finished = 1;
 	bool enablekill = 0;
