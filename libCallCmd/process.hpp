@@ -20,7 +20,10 @@ public:
 	}
 	Process() {
 
-		InitializeCriticalSection(&cs);
+		 InitializeCriticalSection(&cs);
+		/* if (cs.DebugInfo > 0) {
+			 cout << cs.DebugInfo << endl;
+		 }*/
 	}
 	int open(string  command, Callback callback) {
 		do {
@@ -42,13 +45,13 @@ public:
 				LeaveCriticalSection(&cs);
 				break;
 			}
-				
+
 			if (!CreateProcessA(NULL, (char*)command.c_str(), NULL, NULL, TRUE,
 				CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
 				DisplayError("CreateProcess");
-			
+
 			//m_lock.unlock();
-			
+
 			this->m_pid = pi.dwProcessId;
 			this->hProcess = pi.hProcess;
 			this->hThread = pi.hThread;
@@ -104,13 +107,14 @@ public:
 			}
 			if (!CloseHandle(hread)) DisplayError("CloseHandle(hread)");
 			EnterCriticalSection(&cs);
+			
 			if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
 			this->hThread = 0;
 			if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
 			this->hProcess = 0;
 			LeaveCriticalSection(&cs);
 		} while (false);
-		
+
 		DisplayError("open over");
 		this->m_finished = 1;
 		this->enablekill = 0;
@@ -119,7 +123,7 @@ public:
 	}
 	void kill()
 	{
-		
+
 		EnterCriticalSection(&cs);
 		this->enablekill = 1;
 		/*std::string szBuf = std::string("taskkill /PID ") + std::to_string((unsigned)this->m_pid) + (" /T /F");
@@ -145,8 +149,8 @@ public:
 			}
 			TerminateProcess(this->hProcess, 2);
 		}
-		
-		
+
+
 		if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
 		this->hThread = 0;
 		if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
@@ -160,10 +164,8 @@ public:
 		WaitForSingleObject(this->hProcess, INFINITE);
 		if (!GetExitCodeProcess(this->hProcess, &exit_status))
 			exit_status = -1;
-		while (true) {
-
-			if (this->m_finished == 1)
-				break;
+		while (this->m_finished == 0) {
+			
 		}
 		return static_cast<int>(exit_status);
 	}
@@ -175,6 +177,7 @@ public:
 			this->open(command, callback);
 			});
 		thread1.detach();
+		
 		WaitForSingleObject(eve, INFINITE);
 		CloseHandle(eve);
 		return 1;
@@ -184,10 +187,10 @@ private:
 		cout << promt << " error" << endl;
 	}
 private:
-	HANDLE hProcess=0, hThread=0;
-	CRITICAL_SECTION cs;
+	HANDLE hProcess = 0, hThread = 0;
+	 CRITICAL_SECTION cs;
 	DWORD m_pid = 0;
-	BOOL m_finished = 1;
+	volatile BOOL m_finished = 1;
 	bool enablekill = 0;
 };
 
