@@ -15,6 +15,13 @@ using namespace std;
 typedef std::function<void(const char* bytes)>  Callback;
 class Process {
 public:
+	~Process() {
+		DeleteCriticalSection(&cs);//删除临界区
+	}
+	Process() {
+
+		InitializeCriticalSection(&cs);
+	}
 	int open(string  command, Callback callback) {
 		do {
 			this->m_finished = 0;
@@ -30,22 +37,24 @@ public:
 			si.hStdOutput = hwrite;
 			si.wShowWindow = SW_HIDE; //隐藏窗口；
 			//m_lock.lock();
-			this->m_lock_stop.lock();
+			EnterCriticalSection(&cs);
 			if (this->enablekill == true) {
-				this->m_lock_stop.unlock();
+				LeaveCriticalSection(&cs);
 				break;
 			}
 				
 			if (!CreateProcessA(NULL, (char*)command.c_str(), NULL, NULL, TRUE,
 				CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
 				DisplayError("CreateProcess");
-			this->m_lock_stop.unlock();
+			
 			//m_lock.unlock();
-			if (!CloseHandle(hwrite)) DisplayError("CloseHandle(hwrite)");
+			
 			this->m_pid = pi.dwProcessId;
 			this->hProcess = pi.hProcess;
 			this->hThread = pi.hThread;
+			LeaveCriticalSection(&cs);
 
+			if (!CloseHandle(hwrite)) DisplayError("CloseHandle(hwrite)");
 			/*	std::thread threadObj([=] {
 					ansyread(hread, callback);
 					});*/
@@ -94,12 +103,12 @@ public:
 
 			}
 			if (!CloseHandle(hread)) DisplayError("CloseHandle(hread)");
-			m_lock.lock();
+			EnterCriticalSection(&cs);
 			if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
 			this->hThread = 0;
 			if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
 			this->hProcess = 0;
-			m_lock.unlock();
+			LeaveCriticalSection(&cs);
 		} while (false);
 		
 		DisplayError("open over");
@@ -111,7 +120,7 @@ public:
 	void kill()
 	{
 		
-		this->m_lock_stop.lock();
+		EnterCriticalSection(&cs);
 		this->enablekill = 1;
 		/*std::string szBuf = std::string("taskkill /PID ") + std::to_string((unsigned)this->m_pid) + (" /T /F");
 		WinExec(szBuf.c_str(), SW_HIDE);*/
@@ -136,13 +145,13 @@ public:
 			}
 			TerminateProcess(this->hProcess, 2);
 		}
-		this->m_lock_stop.unlock();
-		m_lock.lock();
+		
+		
 		if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
 		this->hThread = 0;
 		if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
 		this->hProcess = 0;
-		m_lock.unlock();
+		LeaveCriticalSection(&cs);
 	}
 	int get_exit_status() {
 		if (this->m_pid == 0)
@@ -176,8 +185,7 @@ private:
 	}
 private:
 	HANDLE hProcess=0, hThread=0;
-	std::mutex m_lock;
-	std::mutex m_lock_stop;
+	CRITICAL_SECTION cs;
 	DWORD m_pid = 0;
 	BOOL m_finished = 1;
 	bool enablekill = 0;
