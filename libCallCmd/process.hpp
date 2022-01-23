@@ -11,6 +11,7 @@
 #include <string>
 #include <TlHelp32.h>
 using namespace std;
+std::mutex gs;
 
 typedef std::function<void(const char* bytes)>  Callback;
 class Process {
@@ -40,9 +41,11 @@ public:
 			si.hStdOutput = hwrite;
 			si.wShowWindow = SW_HIDE; //隐藏窗口；
 			//m_lock.lock();
+			gs.lock();
 			EnterCriticalSection(&cs);
 			if (this->enablekill == true) {
 				LeaveCriticalSection(&cs);
+				gs.unlock();
 				break;
 			}
 
@@ -56,7 +59,7 @@ public:
 			this->hProcess = pi.hProcess;
 			this->hThread = pi.hThread;
 			LeaveCriticalSection(&cs);
-
+			gs.unlock();
 			if (!CloseHandle(hwrite)) DisplayError("CloseHandle(hwrite)");
 			/*	std::thread threadObj([=] {
 					ansyread(hread, callback);
