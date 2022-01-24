@@ -17,16 +17,6 @@ typedef std::function<void(const char* bytes)>  Callback;
 class Process {
 public:
 	
-	~Process() {
-		DeleteCriticalSection(&cs);//删除临界区
-	}
-	Process() {
-
-		InitializeCriticalSection(&cs);
-		/* if (cs.DebugInfo > 0) {
-			 cout << cs.DebugInfo << endl;
-		 }*/
-	}
 	int open(string  command, Callback callback) {
 		do {
 			this->m_finished = 0;
@@ -43,9 +33,9 @@ public:
 			si.wShowWindow = SW_HIDE; //隐藏窗口；
 			//m_lock.lock();
 			getGS().lock();
-			EnterCriticalSection(&cs);
+			lock.lock();
 			if (this->enablekill == true) {
-				LeaveCriticalSection(&cs);
+				lock.unlock();
 				getGS().unlock();
 				break;
 			}
@@ -59,7 +49,7 @@ public:
 			this->m_pid = pi.dwProcessId;
 			this->hProcess = pi.hProcess;
 			this->hThread = pi.hThread;
-			LeaveCriticalSection(&cs);
+			lock.unlock();
 			getGS().unlock();
 			if (!CloseHandle(hwrite)) DisplayError("CloseHandle(hwrite)");
 			/*	std::thread threadObj([=] {
@@ -110,13 +100,13 @@ public:
 
 			}
 			if (!CloseHandle(hread)) DisplayError("CloseHandle(hread)");
-			EnterCriticalSection(&cs);
+			lock.lock();
 
 			if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
 			this->hThread = 0;
 			if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
 			this->hProcess = 0;
-			LeaveCriticalSection(&cs);
+			lock.unlock();
 		} while (false);
 
 		DisplayError("open over");
@@ -128,7 +118,7 @@ public:
 	void kill()
 	{
 
-		EnterCriticalSection(&cs);
+		lock.lock();
 		this->enablekill = 1;
 		/*std::string szBuf = std::string("taskkill /PID ") + std::to_string((unsigned)this->m_pid) + (" /T /F");
 		WinExec(szBuf.c_str(), SW_HIDE);*/
@@ -159,7 +149,7 @@ public:
 		this->hThread = 0;
 		if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
 		this->hProcess = 0;
-		LeaveCriticalSection(&cs);
+		lock.unlock();
 	}
 	int get_exit_status() {
 		if (this->m_pid == 0)
@@ -197,7 +187,7 @@ private:
 	}
 private:
 	HANDLE hProcess = 0, hThread = 0;
-	CRITICAL_SECTION cs;
+	mutex lock;
 	DWORD m_pid = 0;
 	volatile BOOL m_finished = 1;
 	bool enablekill = 0;
