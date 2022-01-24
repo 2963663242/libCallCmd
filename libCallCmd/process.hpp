@@ -11,17 +11,18 @@
 #include <string>
 #include <TlHelp32.h>
 using namespace std;
-std::mutex gs;
+
 
 typedef std::function<void(const char* bytes)>  Callback;
 class Process {
 public:
+	
 	~Process() {
 		DeleteCriticalSection(&cs);//删除临界区
 	}
 	Process() {
 
-		 InitializeCriticalSection(&cs);
+		InitializeCriticalSection(&cs);
 		/* if (cs.DebugInfo > 0) {
 			 cout << cs.DebugInfo << endl;
 		 }*/
@@ -41,11 +42,11 @@ public:
 			si.hStdOutput = hwrite;
 			si.wShowWindow = SW_HIDE; //隐藏窗口；
 			//m_lock.lock();
-			gs.lock();
+			getGS().lock();
 			EnterCriticalSection(&cs);
 			if (this->enablekill == true) {
 				LeaveCriticalSection(&cs);
-				gs.unlock();
+				getGS().unlock();
 				break;
 			}
 
@@ -59,7 +60,7 @@ public:
 			this->hProcess = pi.hProcess;
 			this->hThread = pi.hThread;
 			LeaveCriticalSection(&cs);
-			gs.unlock();
+			getGS().unlock();
 			if (!CloseHandle(hwrite)) DisplayError("CloseHandle(hwrite)");
 			/*	std::thread threadObj([=] {
 					ansyread(hread, callback);
@@ -110,7 +111,7 @@ public:
 			}
 			if (!CloseHandle(hread)) DisplayError("CloseHandle(hread)");
 			EnterCriticalSection(&cs);
-			
+
 			if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
 			this->hThread = 0;
 			if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
@@ -168,7 +169,7 @@ public:
 		if (!GetExitCodeProcess(this->hProcess, &exit_status))
 			exit_status = -1;
 		while (this->m_finished == 0) {
-			
+
 		}
 		return static_cast<int>(exit_status);
 	}
@@ -180,21 +181,27 @@ public:
 			this->open(command, callback);
 			});
 		thread1.detach();
-		
+
 		WaitForSingleObject(eve, INFINITE);
 		CloseHandle(eve);
 		return 1;
 	}
+	public :
+		static std::mutex& getGS() {
+			static std::mutex gs;
+			return gs;
+		}
 private:
 	void DisplayError(const char* promt) {
 		cout << promt << " error" << endl;
 	}
 private:
 	HANDLE hProcess = 0, hThread = 0;
-	 CRITICAL_SECTION cs;
+	CRITICAL_SECTION cs;
 	DWORD m_pid = 0;
 	volatile BOOL m_finished = 1;
 	bool enablekill = 0;
+	
 };
 
 
