@@ -19,7 +19,12 @@ public:
 	
 	int open(string  command, Callback callback) {
 		do {
+			
+			unique_lock<mutex>lock(m_lock);
 			this->m_finished = 0;
+			lock.unlock();
+			
+			
 			HANDLE hread, hwrite;
 			SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
 			if (!CreatePipe(&hread, &hwrite, &sa, 0))
@@ -33,9 +38,9 @@ public:
 			si.wShowWindow = SW_HIDE; //隐藏窗口；
 			//m_lock.lock();
 			getGS().lock();
-			lock.lock();
+			m_lock.lock();
 			if (this->enablekill == true) {
-				lock.unlock();
+				m_lock.unlock();
 				getGS().unlock();
 				break;
 			}
@@ -49,7 +54,7 @@ public:
 			this->m_pid = pi.dwProcessId;
 			this->hProcess = pi.hProcess;
 			this->hThread = pi.hThread;
-			lock.unlock();
+			m_lock.unlock();
 			getGS().unlock();
 			if (!CloseHandle(hwrite)) DisplayError("CloseHandle(hwrite)");
 			/*	std::thread threadObj([=] {
@@ -100,17 +105,22 @@ public:
 
 			}
 			if (!CloseHandle(hread)) DisplayError("CloseHandle(hread)");
-			lock.lock();
+			m_lock.lock();
 
 			if (!CloseHandle(this->hThread)) DisplayError("CloseHandle(this->hThread)");
 			this->hThread = 0;
 			if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
 			this->hProcess = 0;
-			lock.unlock();
+			m_lock.unlock();
 		} while (false);
 
 		DisplayError("open over");
+
+		unique_lock<mutex>lock(m_lock);
 		this->m_finished = 1;
+		cond.notify_all();
+		lock.unlock();
+		
 		this->enablekill = 0;
 		this->m_pid = 0;
 		return  1;
@@ -118,7 +128,7 @@ public:
 	void kill()
 	{
 
-		lock.lock();
+		m_lock.lock();
 		this->enablekill = 1;
 		/*std::string szBuf = std::string("taskkill /PID ") + std::to_string((unsigned)this->m_pid) + (" /T /F");
 		WinExec(szBuf.c_str(), SW_HIDE);*/
@@ -149,7 +159,7 @@ public:
 		this->hThread = 0;
 		if (!CloseHandle(this->hProcess)) DisplayError("CloseHandle(this->hProcess)");
 		this->hProcess = 0;
-		lock.unlock();
+		m_lock.unlock();
 	}
 	int get_exit_status() {
 		if (this->m_pid == 0)
@@ -158,9 +168,11 @@ public:
 		WaitForSingleObject(this->hProcess, INFINITE);
 		if (!GetExitCodeProcess(this->hProcess, &exit_status))
 			exit_status = -1;
-		while (this->m_finished == 0) {
 
-		}
+		unique_lock<mutex>lock(m_lock);
+		cond.wait(lock, [&]() {return m_finished == 1; });
+		lock.unlock();
+
 		return static_cast<int>(exit_status);
 	}
 	int aysnOpen(string  command, Callback callback) {
@@ -168,7 +180,7 @@ public:
 		mutex _mutex;
 
 		this->enablekill = 0;
-
+		
 		thread thread1([&]() {
 			unique_lock<mutex>lock(_mutex);
 			cond.notify_one();
@@ -189,17 +201,21 @@ public:
 			static std::mutex gs;
 			return gs;
 		}
+		static std::mutex& getGS2() {
+			static std::mutex gs;
+			return gs;
+		}
 private:
 	void DisplayError(const char* promt) {
 		cout << promt << " error" << endl;
 	}
 private:
 	HANDLE hProcess = 0, hThread = 0;
-	mutex lock;
+	mutex m_lock;
 	DWORD m_pid = 0;
 	volatile BOOL m_finished = 1;
 	bool enablekill = 0;
-	
+	condition_variable cond;
 };
 
 

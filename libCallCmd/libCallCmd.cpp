@@ -34,7 +34,7 @@ int main()
    // getchar();
    // process.kill();
    // process.get_exit_status();
-    const int n = 2;
+    const int n = 10;
     Process proceses[n];
   
     for (int i = 0; i < n;i++) {
@@ -42,6 +42,7 @@ int main()
             cout << "Output from stdout: " << string(bytes) << endl;
             });
     }
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     for (int i = 0; i < n; i++) {
         proceses[i].kill();
         proceses[i].get_exit_status();
