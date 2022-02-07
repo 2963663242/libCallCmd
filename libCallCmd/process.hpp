@@ -164,16 +164,24 @@ public:
 		return static_cast<int>(exit_status);
 	}
 	int aysnOpen(string  command, Callback callback) {
-		HANDLE eve = CreateEvent(NULL, FALSE, FALSE, NULL);
+		condition_variable cond;
+		mutex _mutex;
+
 		this->enablekill = 0;
-		thread thread1([=]() {
-			SetEvent(eve);
+
+		thread thread1([&]() {
+			unique_lock<mutex>lock(_mutex);
+			cond.notify_one();
+			lock.unlock();
 			this->open(command, callback);
 			});
 		thread1.detach();
 
-		WaitForSingleObject(eve, INFINITE);
-		CloseHandle(eve);
+		unique_lock<mutex>lock(_mutex);
+
+		cond.wait(lock);
+
+		lock.unlock();
 		return 1;
 	}
 	public :
